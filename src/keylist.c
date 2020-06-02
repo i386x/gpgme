@@ -1321,6 +1321,7 @@ gpgme_get_key (gpgme_ctx_t ctx, const char *fpr, gpgme_key_t *r_key,
                  similar hack to sort out such duplicates but it can't
                  do that while listing keys.  */
               gpgme_key_unref (key);
+              key = NULL;
               goto try_next_key;
             }
 	  if (!err)

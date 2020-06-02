@@ -1533,8 +1533,10 @@ gpgsm_export (void *engine, const char *pattern, gpgme_export_mode_t mode,
   gpgsm->output_cb.data = keydata;
   err = gpgsm_set_fd (gpgsm, OUTPUT_FD, use_armor ? "--armor"
 		      : map_data_enc (gpgsm->output_cb.data));
-  if (err)
+  if (err) {
+    free (cmd);
     return err;
+  }
   gpgsm_clear_fd (gpgsm, INPUT_FD);
   gpgsm_clear_fd (gpgsm, MESSAGE_FD);
   gpgsm->inline_data = NULL;
@@ -1634,8 +1636,10 @@ gpgsm_export_ext (void *engine, const char *pattern[], gpgme_export_mode_t mode,
   gpgsm->output_cb.data = keydata;
   err = gpgsm_set_fd (gpgsm, OUTPUT_FD, use_armor ? "--armor"
 		      : map_data_enc (gpgsm->output_cb.data));
-  if (err)
+  if (err) {
+    free (line);
     return err;
+  }
   gpgsm_clear_fd (gpgsm, INPUT_FD);
   gpgsm_clear_fd (gpgsm, MESSAGE_FD);
   gpgsm->inline_data = NULL;

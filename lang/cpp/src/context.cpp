@@ -223,6 +223,7 @@ Context *Context::createForProtocol(Protocol proto)
         }
         break;
     default:
+        gpgme_release(ctx);
         return nullptr;
     }
 
@@ -273,6 +274,7 @@ std::unique_ptr<Context> Context::createForEngine(Engine eng, Error *error)
         }
         break;
     default:
+        gpgme_release(ctx);
         if (error) {
             *error = Error::fromCode(GPG_ERR_INV_ARG);
         }
