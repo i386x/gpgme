@@ -53,7 +53,7 @@
     {
       encodedInput = PyUnicode_AsUTF8String($input);
       if (encodedInput == NULL)
-        return NULL;
+        SWIG_fail;
       $1 = PyBytes_AsString(encodedInput);
     }
   else if (PyBytes_Check($input))
@@ -62,7 +62,7 @@
     PyErr_Format(PyExc_TypeError,
                  "arg %d: expected str, bytes, or None, got %s",
 		 $argnum, $input->ob_type->tp_name);
-    return NULL;
+    SWIG_fail;
   }
 }
 %typemap(freearg) const char * {
@@ -70,14 +70,16 @@
 }
 
 /* Likewise for a list of strings.  */
-%typemap(in) const char *[] (void *vector = NULL,
-                             size_t size,
+%typemap(arginit) const char *[] {
+  $1 = NULL;
+}
+%typemap(in) const char *[] (size_t size,
                              PyObject **pyVector = NULL) {
   /* Check if is a list */
   if (PyList_Check($input)) {
     size_t i, j;
     size = PyList_Size($input);
-    $1 = (char **) (vector = malloc((size+1) * sizeof(char *)));
+    $1 = (char **) malloc((size+1) * sizeof(char *));
     pyVector = calloc(sizeof *pyVector, size);
 
     for (i = 0; i < size; i++) {
@@ -86,12 +88,7 @@
         {
           pyVector[i] = PyUnicode_AsUTF8String(o);
           if (pyVector[i] == NULL)
-            {
-              free(vector);
-              for (j = 0; j < i; j++)
-                Py_XDECREF(pyVector[j]);
-              return NULL;
-            }
+            SWIG_fail;
           $1[i] = PyBytes_AsString(pyVector[i]);
         }
       else if (PyString_Check(o))
@@ -101,8 +98,7 @@
                      "arg %d: list must contain only str or bytes, got %s "
                      "at position %d",
                      $argnum, o->ob_type->tp_name, i);
-	free($1);
-	return NULL;
+	SWIG_fail;
       }
     }
     $1[i] = NULL;
@@ -110,14 +106,17 @@
     PyErr_Format(PyExc_TypeError,
                  "arg %d: expected a list of str or bytes, got %s",
                  $argnum, $input->ob_type->tp_name);
-    return NULL;
+    SWIG_fail;
   }
 }
 %typemap(freearg) const char *[] {
-  size_t i;
-  free(vector$argnum);
-  for (i = 0; i < size$argnum; i++)
-    Py_XDECREF(pyVector$argnum[i]);
+  if (pyVector$argnum) {
+    size_t i;
+    for (i = 0; i < size$argnum; i++)
+      Py_XDECREF(pyVector$argnum[i]);
+    free(pyVector$argnum);
+  }
+  if ($1) free($1);
 }
 
 /* Release returned buffers as necessary.  */
@@ -135,7 +134,7 @@
   if (!PySequence_Check($input)) {
     PyErr_Format(PyExc_ValueError, "arg %d: Expected a list of gpgme_key_t",
 		 $argnum);
-    return NULL;
+    SWIG_fail;
   }
   if((numb = PySequence_Length($input)) != 0) {
     $1 = (gpgme_key_t*)malloc((numb+1)*sizeof(gpgme_key_t));
@@ -152,8 +151,7 @@
                      "arg %d: list must contain only gpgme_key_ts, got %s "
                      "at position %d",
                      $argnum, pypointer->ob_type->tp_name, i);
-        free($1);
-	return NULL;
+	SWIG_fail;
       }
       Py_DECREF(pypointer);
     }
@@ -179,7 +177,7 @@
     pypointer = _gpg_obj2gpgme_data_t($input, $argnum, &wrapper,
                                        &bytesio, &view);
     if (pypointer == NULL)
-      return NULL;
+      SWIG_fail;
     have_view = !! view.obj;
 
     /* input = $input, 1 = $1, 1_descriptor = $1_descriptor */
@@ -189,7 +187,7 @@
     if ((SWIG_ConvertPtr(pypointer,(void **) &$1, $1_descriptor,
          SWIG_POINTER_EXCEPTION | $disown )) == -1) {
       Py_DECREF(pypointer);
-      return NULL;
+      SWIG_fail;
     }
     Py_DECREF(pypointer);
   }
@@ -347,6 +345,10 @@
 }
 
 /* Those are for gpgme_data_read() and gpgme_strerror_r().  */
+%typemap(arginit) (void *buffer, size_t size), (char *buf, size_t buflen) {
+  $1 = NULL;
+  $2 = 0;
+}
 %typemap(in) (void *buffer, size_t size), (char *buf, size_t buflen) {
   {
     long tmp$argnum;
@@ -359,12 +361,12 @@
     else
       {
         PyErr_SetString(PyExc_TypeError, "Numeric argument expected");
-        return NULL;
+        SWIG_fail;
       }
 
     if (tmp$argnum < 0) {
       PyErr_SetString(PyExc_ValueError, "Positive integer expected");
-      return NULL;
+      SWIG_fail;
     }
     $2 = (size_t) tmp$argnum;
     $1 = ($1_ltype) malloc($2+1);
@@ -373,11 +375,11 @@
 %typemap(argout) (void *buffer, size_t size), (char *buf, size_t buflen) {
   Py_XDECREF($result);   /* Blow away any previous result */
   if (result < 0) {      /* Check for I/O error */
-    free($1);
+    if ($1) free($1);
     return PyErr_SetFromErrno(PyExc_RuntimeError);
   }
   $result = PyBytes_FromStringAndSize($1,result);
-  free($1);
+  if ($1) free($1);
 }
 
 /* For gpgme_data_write, but should be universal.  */
@@ -390,11 +392,11 @@
     {
       encodedInput = PyUnicode_AsUTF8String($input);
       if (encodedInput == NULL)
-        return NULL;
+        SWIG_fail;
       if (PyBytes_AsStringAndSize(encodedInput, (char **) &$1, &ssize) == -1)
         {
           Py_DECREF(encodedInput);
-          return NULL;
+          SWIG_fail;
         }
     }
   else if (PyBytes_Check($input))
@@ -403,7 +405,7 @@
     PyErr_Format(PyExc_TypeError,
                  "arg %d: expected str, bytes, or None, got %s",
 		 $argnum, $input->ob_type->tp_name);
-    return NULL;
+    SWIG_fail;
   }
 
   if (! $1)
@@ -432,8 +434,17 @@
     size++;
   }
   $result = PyList_New(size);
+  if ($result == NULL)
+    SWIG_fail;
   for (i=0,curr=$1; i<size; i++,curr=curr->next) {
     PyObject *o = SWIG_NewPointerObj(SWIG_as_voidptr(curr), $1_descriptor, %newpointer_flags);
+    if (o == NULL) {
+      int j;
+      for (j = 0; j < i; j++)
+        Py_XDECREF(PyList_GetItem($result, j));
+      Py_DECREF($result);
+      SWIG_fail;
+    }
     PyList_SetItem($result, i, o);
   }
 }
@@ -446,6 +457,8 @@
   PyObject *fragile;
   fragile = SWIG_NewPointerObj(SWIG_as_voidptr($1), $1_descriptor,
                                %newpointer_flags);
+  if (fragile == NULL)
+    SWIG_fail;
   $result = _gpg_wrap_result(fragile, name);
   Py_DECREF(fragile);
 }
@@ -469,22 +482,28 @@ wrapresult(gpgme_vfs_mount_result_t, "VFSMountResult")
   }
   $result = PyList_New(size);
   if ($result == NULL)
-    return NULL;	/* raise */
+    SWIG_fail;	/* raise */
   for (i=0,curr=$1; i<size; i++,curr=curr->next) {
     PyObject *fragile, *o;
     fragile = SWIG_NewPointerObj(SWIG_as_voidptr(curr), $1_descriptor,
                                  %newpointer_flags);
     if (fragile == NULL)
       {
+        int j;
+        for (j = 0; j < i; j++)
+          Py_XDECREF(PyList_GetItem($result, j));
         Py_DECREF($result);
-        return NULL;	/* raise */
+        SWIG_fail;	/* raise */
       }
     o = _gpg_wrap_result(fragile, "EngineInfo");
     Py_DECREF(fragile);
     if (o == NULL)
       {
+        int j;
+        for (j = 0; j < i; j++)
+          Py_XDECREF(PyList_GetItem($result, j));
         Py_DECREF($result);
-        return NULL;	/* raise */
+        SWIG_fail;	/* raise */
       }
     PyList_SetItem($result, i, o);
   }
