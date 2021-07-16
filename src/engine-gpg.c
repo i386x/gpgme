@@ -1148,6 +1148,7 @@ build_argv (engine_gpg_t gpg, const char *pgmname)
                    to avoid and given that we reach this here only
                    after a malloc failure for a small object, it is
                    probably better not to do anything.  */
+		free_argv (argv);
 		return gpg_error (GPG_ERR_GENERAL);
 	      }
 	    /* If the data_type is FD, we have to do a dup2 here.  */
@@ -1270,6 +1271,9 @@ read_status (engine_gpg_t gpg)
       buffer = realloc (buffer, bufsize);
       if (!buffer)
 	return gpg_error_from_syserror ();
+      /* Update buffer and bufsize here to prevent memory leaks.  */
+      gpg->status.buffer = buffer;
+      gpg->status.bufsize = bufsize;
     }
 
   nread = _gpgme_io_read (gpg->status.fd[0],
@@ -1382,8 +1386,6 @@ read_status (engine_gpg_t gpg)
     }
 
   /* Update the gpg object.  */
-  gpg->status.bufsize = bufsize;
-  gpg->status.buffer = buffer;
   gpg->status.readpos = readpos;
   return 0;
 }
@@ -1423,6 +1425,9 @@ read_colon_line (engine_gpg_t gpg)
       buffer = realloc (buffer, bufsize);
       if (!buffer)
 	return gpg_error_from_syserror ();
+      /* Prevent memory leaks.  */
+      gpg->colon.bufsize = bufsize;
+      gpg->colon.buffer  = buffer;
     }
 
   nread = _gpgme_io_read (gpg->colon.fd[0], buffer+readpos, bufsize-readpos);
@@ -1502,8 +1507,6 @@ read_colon_line (engine_gpg_t gpg)
     }
 
   /* Update the gpg object.  */
-  gpg->colon.bufsize = bufsize;
-  gpg->colon.buffer  = buffer;
   gpg->colon.readpos = readpos;
   return 0;
 }
