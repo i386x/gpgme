@@ -249,6 +249,7 @@ std::vector<GpgME::Key> GpgME::Data::toKeys(Protocol proto) const
     }
 
     if (gpgme_op_keylist_from_data_start (ctx->impl()->ctx, d->data, 0)) {
+        delete ctx;
         return ret;
     }
 
